@@ -8,6 +8,6 @@
 .externalNativeBuild
 .cxx
 local.properties
-
-# Claude Code
 /CLAUDE.md
+.claude
+graphify-out

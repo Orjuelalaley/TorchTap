@@ -12,9 +12,7 @@ import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 
-// Ad unit de PRUEBA oficial de Google para banner.
-// Reemplázalo por tu ad unit real antes de publicar a producción.
-private const val BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
+private const val BANNER_AD_UNIT_ID = "ca-app-pub-6508410833420119/7480130229"
 
 /**
  * This composable adds a banner ad to the screen at the bottom of the screen.

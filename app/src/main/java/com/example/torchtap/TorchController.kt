@@ -16,8 +16,6 @@ class TorchController(context: Context) {
         cameraManager.getCameraCharacteristics(id)
             .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
     }
-
-    // Nivel máximo de brillo soportado por el flash (1 = sin control de brillo).
     private val maxStrengthLevel: Int = torchCameraId?.let { id ->
         cameraManager.getCameraCharacteristics(id)
             .get(CameraCharacteristics.FLASH_INFO_STRENGTH_MAXIMUM_LEVEL) ?: 1
