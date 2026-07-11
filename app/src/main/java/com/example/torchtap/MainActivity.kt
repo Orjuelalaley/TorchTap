@@ -43,6 +43,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
@@ -149,6 +150,18 @@ fun AppRoot(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var selectedTool by rememberSaveable { mutableStateOf(Tool.TORCH) }
+    var torchOn by rememberSaveable { mutableStateOf(false) }
+
+    // The warm background of the lit flashlight is drawn behind the ENTIRE screen
+    // (including the status bar), not just the content. That's why it's located here and not
+    // inside TorchContent. The other tools use the theme's background.
+    val warmOn = if (darkTheme) Color(0xFF15120A) else Color(0xFFFFF3D6)
+    val appBackground by animateColorAsState(
+        targetValue = if (torchOn && selectedTool == Tool.TORCH) warmOn
+        else MaterialTheme.colorScheme.background,
+        animationSpec = tween(400),
+        label = "appBackground",
+    )
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -189,6 +202,7 @@ fun AppRoot(
         },
     ) {
         Scaffold(
+            containerColor = appBackground,
             topBar = {
                 TopAppBar(
                     title = { Text(selectedTool.label) },
@@ -208,6 +222,9 @@ fun AppRoot(
                             )
                         }
                     },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                    ),
                 )
             },
             bottomBar = {
@@ -219,7 +236,8 @@ fun AppRoot(
                     modifier = Modifier.padding(padding),
                     hasFlash = hasFlash,
                     supportsBrightness = supportsBrightness,
-                    darkTheme = darkTheme,
+                    isOn = torchOn,
+                    onIsOnChange = { torchOn = it },
                     onApply = onApply,
                 )
                 Tool.CONVERTER -> ConverterScreen(modifier = Modifier.padding(padding))
@@ -233,96 +251,85 @@ fun TorchContent(
     modifier: Modifier = Modifier,
     hasFlash: Boolean,
     supportsBrightness: Boolean,
-    darkTheme: Boolean,
+    isOn: Boolean,
+    onIsOnChange: (Boolean) -> Unit,
     onApply: (on: Boolean, fraction: Float) -> Unit,
 ) {
-    var isOn by rememberSaveable { mutableStateOf(false) }
     var brightness by rememberSaveable { mutableFloatStateOf(1f) }
 
     val colorScheme = MaterialTheme.colorScheme
 
-    // Fondo cálido cuando la linterna está encendida; sigue el tema cuando está apagada.
-    val warmOn = if (darkTheme) Color(0xFF15120A) else Color(0xFFFFF3D6)
-    val background by animateColorAsState(
-        targetValue = if (isOn) warmOn else colorScheme.background,
-        animationSpec = tween(400),
-        label = "background",
-    )
-
-    Box(
+    // El fondo cálido lo pinta el Scaffold en AppRoot (para que llegue a la barra
+    // de estado); aquí solo se dibuja el contenido, transparente encima de él.
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .background(background),
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            if (!hasFlash) {
-                Text(
-                    text = "Este dispositivo no tiene linterna.",
-                    color = colorScheme.onSurfaceVariant,
-                )
-                return@Column
-            }
-
+        if (!hasFlash) {
             Text(
-                text = if (isOn) "ON" else "OFF",
-                color = if (isOn) colorScheme.primary else colorScheme.onSurfaceVariant,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(40.dp))
-
-            PowerButton(
-                isOn = isOn,
-                onClick = {
-                    isOn = !isOn
-                    onApply(isOn, brightness)
-                },
-            )
-
-            Spacer(Modifier.height(40.dp))
-            Text(
-                text = if (isOn) "Toca para apagar" else "Toca para encender",
+                text = "Este dispositivo no tiene linterna.",
                 color = colorScheme.onSurfaceVariant,
-                fontSize = 15.sp,
             )
+            return@Column
+        }
 
-            // Control de brillo: solo si el dispositivo lo soporta.
-            if (supportsBrightness) {
-                Spacer(Modifier.height(32.dp))
-                Text(
-                    text = "Brillo  ${(brightness * 100).roundToInt()}%",
-                    color = if (isOn) colorScheme.primary else colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-                Slider(
-                    value = brightness,
-                    onValueChange = { value ->
-                        brightness = value
-                        // Reajusta en vivo si la linterna ya está encendida.
-                        if (isOn) onApply(true, value)
-                    },
-                    enabled = isOn,
-                    valueRange = 0f..1f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = colorScheme.primary,
-                        activeTrackColor = colorScheme.primary,
-                        inactiveTrackColor = colorScheme.surfaceVariant,
-                        disabledThumbColor = colorScheme.outline,
-                        disabledActiveTrackColor = colorScheme.outline,
-                        disabledInactiveTrackColor = colorScheme.surfaceVariant,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 48.dp),
-                )
-            }
+        Text(
+            text = if (isOn) "ON" else "OFF",
+            color = if (isOn) colorScheme.primary else colorScheme.onSurfaceVariant,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(40.dp))
+
+        PowerButton(
+            isOn = isOn,
+            onClick = {
+                val next = !isOn
+                onIsOnChange(next)
+                onApply(next, brightness)
+            },
+        )
+
+        Spacer(Modifier.height(40.dp))
+        Text(
+            text = if (isOn) "Toca para apagar" else "Toca para encender",
+            color = colorScheme.onSurfaceVariant,
+            fontSize = 15.sp,
+        )
+
+        // Control de brillo: solo si el dispositivo lo soporta.
+        if (supportsBrightness) {
+            Spacer(Modifier.height(32.dp))
+            Text(
+                text = "Brillo  ${(brightness * 100).roundToInt()}%",
+                color = if (isOn) colorScheme.primary else colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Slider(
+                value = brightness,
+                onValueChange = { value ->
+                    brightness = value
+                    // Reajusta en vivo si la linterna ya está encendida.
+                    if (isOn) onApply(true, value)
+                },
+                enabled = isOn,
+                valueRange = 0f..1f,
+                colors = SliderDefaults.colors(
+                    thumbColor = colorScheme.primary,
+                    activeTrackColor = colorScheme.primary,
+                    inactiveTrackColor = colorScheme.surfaceVariant,
+                    disabledThumbColor = colorScheme.outline,
+                    disabledActiveTrackColor = colorScheme.outline,
+                    disabledInactiveTrackColor = colorScheme.surfaceVariant,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 48.dp),
+            )
         }
     }
 }
